@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>白板</title>
+  <style>
+    html { min-height: 100%; background: #fff; }
+    body { margin: 0; padding: 24px; color: #222; font-family: system-ui, sans-serif; }
+    h1 { margin: 0; font-size: 20px; font-weight: 400; }
+    button { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+    button:focus-visible { outline: 2px solid #777; outline-offset: 5px; }
+    main img { display: block; max-width: 100%; height: auto; margin: 24px 0 0; }
+  </style>
+</head>
+<body>
+  <h1><button id="import" aria-label="白板，点击导入图片" title="点击导入图片">白板</button></h1>
+  <input id="files" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" multiple hidden>
+  <main id="board"></main>
+  <script>
+    const input = document.getElementById('files');
+    const board = document.getElementById('board');
+    const urls = [];
+    async function importImages(files) {
+      let failed = 0;
+      for (const file of files) {
+        if (!['image/png', 'image/jpeg'].includes(file.type) && !(file.type === '' && /\.(png|jpe?g)$/i.test(file.name))) { failed++; continue; }
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.src = url;
+        img.alt = file.name || '导入的题目图片';
+        img.draggable = false;
+        try { await img.decode(); board.append(img); urls.push(url); }
+        catch { URL.revokeObjectURL(url); failed++; }
+      }
+      if (failed) alert(`有 ${failed} 个文件无法导入，请选择有效的 PNG 或 JPG 图片。`);
+    }
+    document.getElementById('import').onclick = () => input.click();
+    input.onchange = () => { importImages([...input.files]); input.value = ''; };
+    document.addEventListener('dragover', event => event.preventDefault());
+    document.addEventListener('drop', event => { event.preventDefault(); importImages([...event.dataTransfer.files]); });
+    document.addEventListener('paste', event => {
+      const files = [...event.clipboardData.files];
+      if (files.length) { event.preventDefault(); importImages(files); }
+    });
+    window.addEventListener('pagehide', event => { if (!event.persisted) urls.forEach(url => URL.revokeObjectURL(url)); });
+  </script>
+</body>
+</html>
