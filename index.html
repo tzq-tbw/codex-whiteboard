@@ -5,37 +5,620 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>白板</title>
   <style>
-    html { min-height: 100%; background: #fff; }
-    body { margin: 0; padding: 24px; color: #222; font-family: system-ui, sans-serif; }
-    h1 { margin: 0; font-size: 20px; font-weight: 400; }
+    html { height: 100%; background: #fff; }
+    body { margin: 0; height: 100vh; display: flex; flex-direction: column; color: #222; font-family: system-ui, sans-serif; }
+    h1 { margin: 0; font-size: 18px; font-weight: 400; }
     button { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
-    button:focus-visible { outline: 2px solid #777; outline-offset: 5px; }
-    main img { display: block; max-width: 100%; height: auto; margin: 24px 0 0; }
+    button:focus-visible { outline: 2px solid #777; outline-offset: 2px; }
+    header { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #e8e8e8; }
+    #reopen { display: none; align-items: center; gap: 6px; color: #555; font-size: 13px; border: 1px solid #e8e8e8; border-radius: 6px; padding: 4px 10px; }
+    #reopen:hover { background: #f5f5f5; }
+    #reopen svg { width: 14px; height: 14px; }
+    body.sidebar-closed #reopen { display: inline-flex; }
+    .app { flex: 1; display: flex; min-height: 0; }
+    aside { width: 208px; flex: none; border-right: 1px solid #e8e8e8; display: flex; flex-direction: column; min-height: 0; background: #fcfcfc; }
+    aside.closed { display: none; }
+    .side-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 8px; }
+    .side-head span { font-size: 13px; color: #555; }
+    #close-sidebar { color: #999; font-size: 16px; line-height: 1; padding: 3px 7px; border-radius: 4px; }
+    #close-sidebar:hover { background: #eee; color: #333; }
+    .side-actions { padding: 0 12px; }
+    #import-side { display: block; width: 100%; box-sizing: border-box; border: 1px dashed #bbb; border-radius: 6px; padding: 8px 0; text-align: center; font-size: 13px; color: #444; background: #fff; }
+    #import-side:hover { border-color: #888; background: #f7f7f7; }
+    .side-hint { padding: 8px 12px 6px; font-size: 11px; color: #aaa; }
+    #thumbs { flex: 1; overflow-y: auto; padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .thumb { position: relative; flex: none; border: 2px solid #eee; border-radius: 8px; overflow: hidden; cursor: pointer; background: #fff; }
+    .thumb.active { border-color: #4a89dc; }
+    .thumb img { display: block; width: 100%; height: 74px; object-fit: cover; pointer-events: none; }
+    .thumb .name { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 6px; font-size: 11px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.55)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .thumb .del { position: absolute; top: 4px; right: 4px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.5); color: #fff; font-size: 11px; line-height: 18px; text-align: center; visibility: hidden; }
+    .thumb:hover .del { visibility: visible; }
+    .thumb .del:hover { background: rgba(0,0,0,.75); }
+    main { flex: 1; position: relative; min-width: 0; background: #f7f7f8; }
+    #scroller { position: absolute; inset: 0; overflow: auto; display: flex; padding: 24px; box-sizing: border-box; }
+    #stage { margin: auto; flex: none; position: relative; }
+    #view { display: block; box-shadow: 0 1px 8px rgba(0,0,0,.12); background: #fff; }
+    #ink { position: absolute; left: 0; top: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+    body.erasing #ink { cursor: none; }
+    #eraser-cursor { position: absolute; border: 1.5px dashed #888; border-radius: 50%; pointer-events: none; display: none; transform: translate(-50%, -50%); }
+    #page-pill { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); padding: 4px 14px; background: rgba(255,255,255,.92); border: 1px solid #e2e2e2; border-radius: 999px; font-size: 12px; color: #666; pointer-events: none; display: none; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    body.has-image #page-pill { display: block; }
+    #empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #b5b5b5; font-size: 14px; text-align: center; padding: 20px; }
+    #empty p { margin: 0; line-height: 2; }
+    body.has-image #empty { display: none; }
+    body:not(.has-image) #toolbar, body:not(.has-image) #zoombar { display: none; }
+    .controls { position: absolute; left: 12px; right: 12px; bottom: 18px; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; pointer-events: none; }
+    #toolbar, #zoombar { display: flex; align-items: center; gap: 2px; padding: 5px 7px; background: #fff; border: 1px solid #e2e2e2; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.12); user-select: none; pointer-events: auto; box-sizing: border-box; }
+    #toolbar { flex-wrap: wrap; justify-content: center; max-width: 100%; }
+    .tool { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #555; flex: none; }
+    .tool:hover { background: #f0f0f0; }
+    .tool.active { background: #e8f0fe; color: #1a56db; }
+    .tool svg { width: 20px; height: 20px; }
+    .tool .dot { width: 17px; height: 17px; border-radius: 50%; }
+    .dot.red { background: #e03131; }
+    .dot.blue { background: #1971c2; }
+    .wdot { display: block; border-radius: 50%; background: #555; }
+    .sep { width: 1px; height: 22px; background: #e5e5e5; margin: 0 5px; flex: none; }
+    .tool:disabled { opacity: .3; cursor: default; pointer-events: none; }
+    #zoom-pct { width: auto; min-width: 46px; padding: 0 6px; font-size: 12px; color: #666; }
+    #zoom-minus, #zoom-plus { font-size: 19px; font-family: system-ui; }
   </style>
 </head>
 <body>
-  <h1><button id="import" aria-label="白板，点击导入图片" title="点击导入图片">白板</button></h1>
+  <header>
+    <h1><button id="import" aria-label="白板，点击导入图片" title="点击导入图片">白板</button></h1>
+    <button id="reopen" title="打开图片列表">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+      <span id="reopen-count">图片</span>
+    </button>
+  </header>
   <input id="files" type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" multiple hidden>
-  <main id="board"></main>
+  <div class="app">
+    <aside id="sidebar">
+      <div class="side-head">
+        <span>图片（<b id="count">0</b>）</span>
+        <button id="close-sidebar" aria-label="收起侧边栏" title="收起侧边栏">×</button>
+      </div>
+      <div class="side-actions"><button id="import-side">＋ 导入图片</button></div>
+      <div class="side-hint">支持拖入 / 粘贴截图</div>
+      <div id="thumbs"></div>
+    </aside>
+    <main id="main">
+      <div id="scroller">
+        <div id="stage" hidden>
+          <img id="view" alt="" draggable="false">
+          <canvas id="ink"></canvas>
+          <div id="eraser-cursor"></div>
+        </div>
+      </div>
+      <div id="page-pill"></div>
+      <div id="empty"><p>点击"导入图片"，或把图片 / 截图直接<strong>拖入或粘贴</strong>到页面<br>用红蓝笔、直线在图片上批注；<strong>Ctrl+滚轮</strong> 缩放图片，放大后可滚动看细节</p></div>
+      <div class="controls">
+      <div id="toolbar">
+        <button class="tool" data-tool="pen-red" aria-label="红笔" title="红笔"><span class="dot red"></span></button>
+        <button class="tool" data-tool="pen-blue" aria-label="蓝笔" title="蓝笔"><span class="dot blue"></span></button>
+        <span class="sep"></span>
+        <button class="tool" data-tool="line" aria-label="直线" title="直线：按住拖动，一拉即成直线"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 18 18 6"/><circle cx="6" cy="18" r="1.7" fill="currentColor" stroke="none"/><circle cx="18" cy="6" r="1.7" fill="currentColor" stroke="none"/></svg></button>
+        <button class="tool" data-tool="erase" aria-label="橡皮擦" title="橡皮擦：碰到笔画即整条删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 8 8"/></svg></button>
+        <span class="sep"></span>
+        <button class="tool width-btn" data-w="0" aria-label="细笔" title="细笔"><span class="wdot" style="width:5px;height:5px"></span></button>
+        <button class="tool width-btn" data-w="1" aria-label="中等笔宽" title="中等笔宽"><span class="wdot" style="width:9px;height:9px"></span></button>
+        <button class="tool width-btn" data-w="2" aria-label="粗笔" title="粗笔"><span class="wdot" style="width:13px;height:13px"></span></button>
+        <span class="sep"></span>
+        <button class="tool" id="undo" aria-label="撤销" title="撤销（Ctrl+Z）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
+        <button class="tool" id="redo" aria-label="重做" title="重做（Ctrl+Y）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
+        <button class="tool" id="clear" aria-label="清空当前页批注" title="清空当前页批注"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+      </div>
+      <div id="zoombar">
+        <button class="tool" id="zoom-minus" aria-label="缩小" title="缩小">−</button>
+        <button class="tool" id="zoom-pct" aria-label="缩放比例" title="相对“适应窗口”的缩放比例，点击恢复适应窗口">100%</button>
+        <button class="tool" id="zoom-plus" aria-label="放大" title="放大">＋</button>
+        <button class="tool" id="zoom-fit" aria-label="适应窗口" title="适应窗口（Ctrl+0）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+      </div>
+      </div>
+    </main>
+  </div>
   <script>
+    // ===== perfect-freehand v1.2.3（内联官方压缩版源码） =====
+    // MIT License · Copyright (c) 2020 Steve Ruiz · https://github.com/steveruizok/perfect-freehand
+    // Excalidraw 同款笔迹引擎：按书写速度模拟压感，生成变宽圆头笔迹轮廓
+    const PF = (() => {
+      const{PI:e}=Math,t=e+1e-4,n=.5,r=[1,1];function i(e,t,n,r=e=>e){return e*r(.5-t*(.5-n))}const{min:a}=Math;function o(e,t,n){let r=a(1,t/n);return a(1,e+(a(1,1-r)-e)*(r*.275))}function s(e){return[-e[0],-e[1]]}function c(e,t){return[e[0]+t[0],e[1]+t[1]]}function l(e,t,n){return e[0]=t[0]+n[0],e[1]=t[1]+n[1],e}function u(e,t){return[e[0]-t[0],e[1]-t[1]]}function d(e,t,n){return e[0]=t[0]-n[0],e[1]=t[1]-n[1],e}function f(e,t){return[e[0]*t,e[1]*t]}function p(e,t,n){return e[0]=t[0]*n,e[1]=t[1]*n,e}function m(e,t){return[e[0]/t,e[1]/t]}function h(e){return[e[1],-e[0]]}function g(e,t){let n=t[0];return e[0]=t[1],e[1]=-n,e}function ee(e,t){return e[0]*t[0]+e[1]*t[1]}function _(e,t){return e[0]===t[0]&&e[1]===t[1]}function v(e){return Math.hypot(e[0],e[1])}function y(e,t){let n=e[0]-t[0],r=e[1]-t[1];return n*n+r*r}function b(e){return m(e,v(e))}function x(e,t){return Math.hypot(e[1]-t[1],e[0]-t[0])}function S(e,t,n){let r=Math.sin(n),i=Math.cos(n),a=e[0]-t[0],o=e[1]-t[1],s=a*i-o*r,c=a*r+o*i;return[s+t[0],c+t[1]]}function C(e,t,n,r){let i=Math.sin(r),a=Math.cos(r),o=t[0]-n[0],s=t[1]-n[1],c=o*a-s*i,l=o*i+s*a;return e[0]=c+n[0],e[1]=l+n[1],e}function w(e,t,n){return c(e,f(u(t,e),n))}function te(e,t,n,r){let i=n[0]-t[0],a=n[1]-t[1];return e[0]=t[0]+i*r,e[1]=t[1]+a*r,e}function T(e,t,n){return c(e,f(t,n))}const E=[0,0],D=[0,0],O=[0,0];function k(e,n){let r=T(e,b(h(u(e,c(e,[1,1])))),-n),i=[],a=1/13;for(let n=a;n<=1;n+=a)i.push(S(r,e,t*2*n));return i}function A(e,n,r){let i=[],a=1/r;for(let r=a;r<=1;r+=a)i.push(S(n,e,t*r));return i}function j(e,t,n){let r=u(t,n),i=f(r,.5),a=f(r,.51);return[u(e,i),u(e,a),c(e,a),c(e,i)]}function M(e,n,r,i){let a=[],o=T(e,n,r),s=1/i;for(let n=s;n<1;n+=s)a.push(S(o,e,t*3*n));return a}function ne(e,t,n){return[c(e,f(t,n)),c(e,f(t,n*.99)),u(e,f(t,n*.99)),u(e,f(t,n))]}function N(e,t,n){return e===!1||e===void 0?0:e===!0?Math.max(t,n):e}function re(e,t,n){return e.slice(0,10).reduce((e,r)=>{let i=r.pressure;return t&&(i=o(e,r.distance,n)),(e+i)/2},e[0].pressure)}function P(e,n={}){let{size:r=16,smoothing:a=.5,thinning:f=.5,simulatePressure:m=!0,easing:_=e=>e,start:v={},end:b={},last:x=!1}=n,{cap:S=!0,easing:w=e=>e*(2-e)}=v,{cap:T=!0,easing:P=e=>--e*e*e+1}=b;if(e.length===0||r<=0)return[];let F=e[e.length-1].runningLength,I=N(v.taper,r,F),L=N(b.taper,r,F),R=(r*a)**2,z=[],B=[],V=re(e,m,r),H=i(r,f,e[e.length-1].pressure,_),U,W=e[0].vector,G=e[0].point,K=G,q=G,J=K,Y=!1;for(let n=0;n<e.length;n++){let{pressure:a}=e[n],{point:s,vector:h,distance:v,runningLength:b}=e[n],x=n===e.length-1;if(!x&&F-b<3)continue;f?(m&&(a=o(V,v,r)),H=i(r,f,a,_)):H=r/2,U===void 0&&(U=H);let S=b<I?w(b/I):1,T=F-b<L?P((F-b)/L):1;H=Math.max(.01,H*Math.min(S,T));let k=(x?e[n]:e[n+1]).vector,A=x?1:ee(h,k),j=ee(h,W)<0&&!Y,M=A!==null&&A<0;if(j||M){g(E,W),p(E,E,H);for(let e=0;e<=1;e+=.07692307692307693)d(D,s,E),C(D,D,s,t*e),q=[D[0],D[1]],z.push(q),l(O,s,E),C(O,O,s,t*-e),J=[O[0],O[1]],B.push(J);G=q,K=J,M&&(Y=!0);continue}if(Y=!1,x){g(E,h),p(E,E,H),z.push(u(s,E)),B.push(c(s,E));continue}te(E,k,h,A),g(E,E),p(E,E,H),d(D,s,E),q=[D[0],D[1]],(n<=1||y(G,q)>R)&&(z.push(q),G=q),l(O,s,E),J=[O[0],O[1]],(n<=1||y(K,J)>R)&&(B.push(J),K=J),V=a,W=h}let X=[e[0].point[0],e[0].point[1]],Z=e.length>1?[e[e.length-1].point[0],e[e.length-1].point[1]]:c(e[0].point,[1,1]),Q=[],$=[];if(e.length===1){if(!(I||L)||x)return k(X,U||H)}else{I||L&&e.length===1||(S?Q.push(...A(X,B[0],13)):Q.push(...j(X,z[0],B[0])));let t=h(s(e[e.length-1].vector));L||I&&e.length===1?$.push(Z):T?$.push(...M(Z,t,H,29)):$.push(...ne(Z,t,H))}return z.concat($,B.reverse(),Q)}const F=[0,0];function I(e){return e!=null&&e>=0}function L(e,t={}){let{streamline:i=.5,size:a=16,last:o=!1}=t;if(e.length===0)return[];let s=.15+(1-i)*.85,l=Array.isArray(e[0])?e:e.map(({x:e,y:t,pressure:r=n})=>[e,t,r]);if(l.length===2){let e=l[1];l=l.slice(0,-1);for(let t=1;t<5;t++)l.push(w(l[0],e,t/4))}l.length===1&&(l=[...l,[...c(l[0],r),...l[0].slice(2)]]);let u=[{point:[l[0][0],l[0][1]],pressure:I(l[0][2])?l[0][2]:.25,vector:[...r],distance:0,runningLength:0}],f=!1,p=0,m=u[0],h=l.length-1;for(let e=1;e<l.length;e++){let t=o&&e===h?[l[e][0],l[e][1]]:w(m.point,l[e],s);if(_(m.point,t))continue;let r=x(t,m.point);if(p+=r,e<h&&!f){if(p<a)continue;f=!0}d(F,m.point,t),m={point:t,pressure:I(l[e][2])?l[e][2]:n,vector:b(F),distance:r,runningLength:p},u.push(m)}return u[0].vector=u[1]?.vector||[0,0],u}function R(e,t={}){return P(L(e,t),t)}
+      return { getStroke: R };
+    })();
+
     const input = document.getElementById('files');
-    const board = document.getElementById('board');
-    const urls = [];
+    const sidebar = document.getElementById('sidebar');
+    const thumbs = document.getElementById('thumbs');
+    const scroller = document.getElementById('scroller');
+    const stage = document.getElementById('stage');
+    const view = document.getElementById('view');
+    const canvas = document.getElementById('ink');
+    const ctx = canvas.getContext('2d');
+    const eraserCursor = document.getElementById('eraser-cursor');
+    const main = document.getElementById('main');
+    const countEl = document.getElementById('count');
+    const reopenBtn = document.getElementById('reopen');
+    const reopenCount = document.getElementById('reopen-count');
+    const toolbar = document.getElementById('toolbar');
+    const pagePill = document.getElementById('page-pill');
+    const zoomPct = document.getElementById('zoom-pct');
+    const zoomMinus = document.getElementById('zoom-minus');
+    const zoomPlus = document.getElementById('zoom-plus');
+
+    const COLORS = { 'pen-red': '#e03131', 'pen-blue': '#1971c2' };
+    const WIDTHS = [3, 5, 9];   // 屏幕像素：细 / 中 / 粗
+    const ERASER_RADIUS = 16;   // 屏幕像素
+    const ZOOM_MIN = .25, ZOOM_MAX_SOFT = 10;
+
+    // pages: { id, name, url, img, strokes, undo, redo, zoom }，strokes 内坐标为图片原始像素坐标
+    const pages = [];
+    let activeId = null;
+    let uid = 0;
+    let tool = 'pen-red'; // pen-red | pen-blue | line | erase
+    let lineColor = COLORS['pen-red'];
+    let widthIdx = 1;
+    let drawing = null;
+
+    function activePage() { return pages.find(p => p.id === activeId) || null; }
+    function fitScale() { // 适应窗口时的缩放
+      const rec = activePage();
+      const img = rec.img;
+      const availW = Math.max(50, scroller.clientWidth - 48);
+      const availH = Math.max(50, scroller.clientHeight - 48);
+      return Math.min(availW / img.naturalWidth, availH / img.naturalHeight);
+    }
+    function maxZoom() { // 受画布尺寸上限约束的最大缩放
+      const rec = activePage();
+      const img = rec.img, dpr = window.devicePixelRatio || 1, f = fitScale() || 1;
+      return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX_SOFT, 16384 / (dpr * img.naturalWidth * f), 16384 / (dpr * img.naturalHeight * f)));
+    }
+    function toNatural(clientX, clientY) {
+      const r = canvas.getBoundingClientRect();
+      const img = activePage().img;
+      return [
+        (clientX - r.left) * img.naturalWidth / r.width,
+        (clientY - r.top) * img.naturalHeight / r.height
+      ];
+    }
+
+    function layout() {
+      const rec = activePage();
+      if (!rec) return;
+      const img = rec.img;
+      const dpr = window.devicePixelRatio || 1;
+      const scale = Math.min(fitScale() * rec.zoom, 16384 / (dpr * img.naturalWidth), 16384 / (dpr * img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * scale));
+      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      stage.style.width = w + 'px';
+      stage.style.height = h + 'px';
+      view.style.width = w + 'px';
+      view.style.height = h + 'px';
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      redraw();
+      updateZoombar();
+    }
+
+    function redraw() {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const rec = activePage();
+      if (!rec) return;
+      const sx = canvas.width / rec.img.naturalWidth;
+      const sy = canvas.height / rec.img.naturalHeight;
+      ctx.setTransform(sx, 0, 0, sy, 0, 0);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      for (const s of rec.strokes) strokePath(s, true);
+    }
+
+    function buildPenPath(points, width) {
+      // 存储为扁平数组 [x0,y0,x1,y1,...]，perfect-freehand 需要 [[x,y],...] 点对
+      const pts = [];
+      for (let i = 0; i < points.length; i += 2) pts.push([points[i], points[i + 1]]);
+      const outline = PF.getStroke(pts, { size: width, thinning: .5, smoothing: .5, streamline: .5, simulatePressure: true, last: true });
+      const path = new Path2D();
+      if (!outline.length) return path;
+      path.moveTo(outline[0][0], outline[0][1]);
+      for (let i = 1; i < outline.length; i++) path.lineTo(outline[i][0], outline[i][1]);
+      path.closePath();
+      return path;
+    }
+
+    function strokePath(s, cache) {
+      if (s.kind === 'line') {
+        const p = s.points;
+        ctx.strokeStyle = s.color;
+        ctx.lineWidth = s.width;
+        ctx.beginPath();
+        ctx.moveTo(p[0], p[1]);
+        ctx.lineTo(p[2], p[3]);
+        ctx.stroke();
+        return;
+      }
+      // pen：perfect-freehand 变宽笔迹（轮廓填充）
+      if (cache && !s._path) s._path = buildPenPath(s.points, s.width);
+      const path = cache ? s._path : buildPenPath(s.points, s.width);
+      ctx.fillStyle = s.color;
+      ctx.fill(path);
+    }
+
+    // ---- 缩放（每页独立记忆）----
+    function zoomTo(factor, clientX, clientY) { // 以视口坐标 clientX/Y 为锚点缩放
+      const rec = activePage();
+      if (!rec) return;
+      const rect0 = canvas.getBoundingClientRect();
+      const natX = (clientX - rect0.left) / rect0.width;
+      const natY = (clientY - rect0.top) / rect0.height;
+      const next = Math.min(maxZoom(), Math.max(ZOOM_MIN, rec.zoom * factor));
+      if (next === rec.zoom) return;
+      rec.zoom = next;
+      layout();
+      // 缩放后调整滚动，让同一图片点回到锚点下方（用实测位置，不依赖布局模型）
+      const rect1 = canvas.getBoundingClientRect();
+      scroller.scrollLeft += rect1.left - (clientX - natX * rect1.width);
+      scroller.scrollTop += rect1.top - (clientY - natY * rect1.height);
+    }
+    function zoomCenter(factor) {
+      const r = scroller.getBoundingClientRect();
+      zoomTo(factor, r.left + scroller.clientWidth / 2, r.top + scroller.clientHeight / 2);
+    }
+    function zoomFit() {
+      const rec = activePage();
+      if (!rec) return;
+      rec.zoom = 1;
+      layout();
+      scroller.scrollLeft = 0;
+      scroller.scrollTop = 0;
+    }
+    function updateZoombar() {
+      const rec = activePage();
+      zoomPct.textContent = rec ? Math.round(rec.zoom * 100) + '%' : '';
+      zoomPlus.disabled = !rec || rec.zoom >= maxZoom() - 1e-6;
+      zoomMinus.disabled = !rec || rec.zoom <= ZOOM_MIN + 1e-6;
+    }
+    zoomPct.onclick = zoomFit;
+    document.getElementById('zoom-fit').onclick = zoomFit;
+    zoomMinus.onclick = () => zoomCenter(1 / 1.25);
+    zoomPlus.onclick = () => zoomCenter(1.25);
+    scroller.addEventListener('wheel', e => {
+      if (!activePage() || !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      zoomTo(Math.exp(-e.deltaY * 0.002), e.clientX, e.clientY);
+    }, { passive: false });
+
+    // ---- 绘制 ----
+    canvas.addEventListener('pointerdown', e => {
+      const rec = activePage();
+      if (!rec || drawing || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      e.preventDefault();
+      try { canvas.setPointerCapture(e.pointerId); } catch {}
+      const kind = tool === 'erase' ? 'erase' : tool === 'line' ? 'line' : 'pen';
+      const [x, y] = toNatural(e.clientX, e.clientY);
+      const scale = screenScale();
+      drawing = {
+        kind, scale, pointerId: e.pointerId, erased: false,
+        color: tool === 'pen-blue' ? COLORS['pen-blue'] : tool === 'pen-red' ? COLORS['pen-red'] : lineColor,
+        width: WIDTHS[widthIdx] * scale,
+        points: kind === 'line' ? [x, y, x, y] : [x, y],
+      };
+      if (kind === 'erase') {
+        eraseSegment(x, y);
+      } else if (kind === 'pen') {
+        redraw();
+        strokePath(drawing, false); // 落笔即出点
+      }
+    });
+
+    function screenScale() { // 每屏幕像素对应的图片原始像素
+      const r = canvas.getBoundingClientRect();
+      return activePage().img.naturalWidth / r.width;
+    }
+
+    canvas.addEventListener('pointermove', e => {
+      if (drawing && e.pointerId !== drawing.pointerId) return;
+      if (tool === 'erase') moveEraserCursor(e);
+      if (!drawing) return;
+      const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+      const evs = coalesced && coalesced.length ? coalesced : [e];
+      for (const ev of evs) moveDraw(ev);
+    });
+
+    function moveDraw(ev, final = false) {
+        const [x, y] = toNatural(ev.clientX, ev.clientY);
+        if (drawing.kind === 'erase') {
+          eraseSegment(x, y);
+        } else if (drawing.kind === 'pen') {
+          const p = drawing.points, n = p.length;
+          const dx = x - p[n - 2], dy = y - p[n - 1];
+          const minDist = 2 * drawing.scale;
+          if (dx === 0 && dy === 0) return;
+          if (!final && dx * dx + dy * dy < minDist * minDist) return;
+          p.push(x, y);
+          redraw();
+          strokePath(drawing, false);
+        } else {
+          drawing.points[2] = x; drawing.points[3] = y;
+          redraw();
+          strokePath(drawing, false);
+        }
+    }
+
+    function endDraw(e) {
+      if (!drawing || (e && e.pointerId !== drawing.pointerId)) return;
+      if (e && e.type === 'pointerup') moveDraw(e, true);
+      const rec = activePage();
+      const d = drawing;
+      drawing = null;
+      if (!rec) return;
+      if (d.kind === 'erase') { /* 撤销快照在首次实际擦除时保存 */ }
+      else if (d.kind === 'pen') {
+        const p = d.points;
+        if (p.length === 2) p.push(p[0] + 0.3 * d.scale, p[1] + 0.3 * d.scale);
+        pushUndo(rec);
+        rec.strokes.push({ kind: 'pen', color: d.color, width: d.width, points: p });
+        redraw();
+      } else {
+        pushUndo(rec);
+        rec.strokes.push({ kind: 'line', color: d.color, width: d.width, points: [d.points[0], d.points[1], d.points[2], d.points[3]] });
+        redraw();
+      }
+      updateButtons();
+      if (canvas.hasPointerCapture(d.pointerId)) canvas.releasePointerCapture(d.pointerId);
+    }
+    canvas.addEventListener('pointerup', endDraw);
+    canvas.addEventListener('pointercancel', endDraw);
+    canvas.addEventListener('lostpointercapture', endDraw);
+
+    // ---- 橡皮擦（碰到笔画整条删除）----
+    function eraseSegment(x, y) {
+      const rec = activePage();
+      const p = drawing.points;
+      const prev = p.length >= 2 ? p.slice(-2) : null;
+      p.push(x, y);
+      const r = ERASER_RADIUS * drawing.scale;
+      let removed = false;
+      const keep = rec.strokes.filter(s => {
+        const hit = prev ? segHitStroke(prev[0], prev[1], x, y, s, r) : strokePointHit(s, x, y, r);
+        if (hit) removed = true;
+        return !hit;
+      });
+      if (removed) {
+        if (!drawing.erased) { pushUndo(rec); drawing.erased = true; }
+        rec.strokes = keep;
+        redraw();
+      }
+    }
+
+    function segHitStroke(x1, y1, x2, y2, s, r) {
+      const len = Math.hypot(x2 - x1, y2 - y1);
+      const steps = Math.max(1, Math.ceil(len / (r * 0.5)));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        if (strokePointHit(s, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, r)) return true;
+      }
+      return false;
+    }
+
+    function strokePointHit(s, px, py, r) {
+      const p = s.points;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (let i = 0; i < p.length; i += 2) {
+        if (p[i] < minX) minX = p[i]; if (p[i] > maxX) maxX = p[i];
+        if (p[i + 1] < minY) minY = p[i + 1]; if (p[i + 1] > maxY) maxY = p[i + 1];
+      }
+      const reach = r + s.width / 2 + 0.5;
+      if (px < minX - reach || px > maxX + reach || py < minY - reach || py > maxY + reach) return false;
+      const t2 = reach * reach;
+      if (s.kind === 'line') return distPtSeg2(px, py, p[0], p[1], p[2], p[3]) <= t2;
+      if (p.length === 2) { const dx = px - p[0], dy = py - p[1]; return dx * dx + dy * dy <= t2; }
+      for (let i = 0; i + 3 < p.length; i += 2) {
+        if (distPtSeg2(px, py, p[i], p[i + 1], p[i + 2], p[i + 3]) <= t2) return true;
+      }
+      return false;
+    }
+
+    function distPtSeg2(px, py, ax, ay, bx, by) {
+      const dx = bx - ax, dy = by - ay;
+      const l2 = dx * dx + dy * dy;
+      let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = ax + t * dx - px, ey = ay + t * dy - py;
+      return ex * ex + ey * ey;
+    }
+
+    function moveEraserCursor(e) {
+      const rect = stage.getBoundingClientRect();
+      eraserCursor.style.left = (e.clientX - rect.left) + 'px';
+      eraserCursor.style.top = (e.clientY - rect.top) + 'px';
+    }
+    canvas.addEventListener('pointerenter', e => {
+      if (tool === 'erase') {
+        const d = ERASER_RADIUS * 2;
+        eraserCursor.style.width = d + 'px';
+        eraserCursor.style.height = d + 'px';
+        eraserCursor.style.display = 'block';
+        moveEraserCursor(e);
+      }
+    });
+    canvas.addEventListener('pointerleave', () => { eraserCursor.style.display = 'none'; });
+
+    // ---- 撤销 / 重做 / 清空 ----
+    function pushUndo(rec) {
+      rec.undo.push(rec.strokes.slice());
+      if (rec.undo.length > 100) rec.undo.shift();
+      rec.redo.length = 0;
+    }
+    function undo() {
+      endDraw();
+      const rec = activePage();
+      if (!rec || !rec.undo.length) return;
+      rec.redo.push(rec.strokes.slice());
+      rec.strokes = rec.undo.pop();
+      redraw(); updateButtons();
+    }
+    function redo() {
+      endDraw();
+      const rec = activePage();
+      if (!rec || !rec.redo.length) return;
+      rec.undo.push(rec.strokes.slice());
+      rec.strokes = rec.redo.pop();
+      redraw(); updateButtons();
+    }
+    function clearPage() {
+      endDraw();
+      const rec = activePage();
+      if (!rec || !rec.strokes.length) return;
+      pushUndo(rec);
+      rec.strokes.length = 0;
+      redraw(); updateButtons();
+    }
+    function updateButtons() {
+      const rec = activePage();
+      document.getElementById('undo').disabled = !rec || !rec.undo.length;
+      document.getElementById('redo').disabled = !rec || !rec.redo.length;
+      document.getElementById('clear').disabled = !rec || !rec.strokes.length;
+    }
+    document.getElementById('undo').onclick = undo;
+    document.getElementById('redo').onclick = redo;
+    document.getElementById('clear').onclick = clearPage;
+    document.addEventListener('keydown', e => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+      else if (k === '0') { e.preventDefault(); zoomFit(); }
+    });
+
+    // ---- 笔筒工具 / 笔宽切换 ----
+    toolbar.querySelectorAll('[data-tool]').forEach(btn =>
+      btn.addEventListener('click', () => setTool(btn.dataset.tool)));
+    function setTool(t) {
+      endDraw();
+      tool = t;
+      if (t === 'pen-red') lineColor = COLORS['pen-red'];
+      if (t === 'pen-blue') lineColor = COLORS['pen-blue'];
+      toolbar.querySelectorAll('[data-tool]').forEach(b => {
+        const on = b.dataset.tool === tool;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on);
+      });
+      const lineBtn = toolbar.querySelector('[data-tool="line"]');
+      lineBtn.style.color = lineColor;
+      lineBtn.title = `直线：按住拖动，一拉即成直线（${tool === 'pen-blue' || lineColor === COLORS['pen-blue'] ? '蓝' : '红'}色）`;
+      document.body.classList.toggle('erasing', tool === 'erase');
+      eraserCursor.style.display = 'none';
+    }
+    toolbar.querySelectorAll('.width-btn').forEach(btn =>
+      btn.addEventListener('click', () => setWidth(+btn.dataset.w)));
+    function setWidth(i) {
+      widthIdx = i;
+      toolbar.querySelectorAll('.width-btn').forEach(b => {
+        const on = +b.dataset.w === widthIdx;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-pressed', on);
+      });
+    }
+    setTool('pen-red');
+    setWidth(1);
+
+    // ---- 侧边栏 ----
+    function openSidebar() { sidebar.classList.remove('closed'); document.body.classList.remove('sidebar-closed'); }
+    function closeSidebar() { sidebar.classList.add('closed'); document.body.classList.add('sidebar-closed'); }
+    document.getElementById('close-sidebar').onclick = closeSidebar;
+    reopenBtn.onclick = openSidebar;
+
+    function renderThumbs() {
+      thumbs.textContent = '';
+      for (const rec of pages) {
+        const item = document.createElement('div');
+        item.className = 'thumb' + (rec.id === activeId ? ' active' : '');
+        item.tabIndex = 0;
+        item.setAttribute('role', 'button');
+        item.setAttribute('aria-label', '显示 ' + rec.name);
+        const img = document.createElement('img');
+        img.src = rec.url; img.alt = ''; img.draggable = false;
+        const name = document.createElement('span');
+        name.className = 'name'; name.textContent = rec.name;
+        const del = document.createElement('button');
+        del.className = 'del'; del.textContent = '×';
+        del.setAttribute('aria-label', '删除 ' + rec.name);
+        del.title = '删除这张图片';
+        del.addEventListener('click', e => { e.stopPropagation(); removePage(rec.id); });
+        item.append(img, name, del);
+        item.addEventListener('click', () => setActive(rec.id));
+        item.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActive(rec.id); }
+        });
+        thumbs.append(item);
+      }
+      countEl.textContent = pages.length;
+      reopenCount.textContent = `图片（${pages.length}）`;
+      const i = pages.findIndex(p => p.id === activeId);
+      pagePill.textContent = i >= 0 ? `第 ${i + 1} / ${pages.length} 页` : '';
+    }
+
+    function setActive(id) {
+      const rec = pages.find(p => p.id === id);
+      if (!rec) return;
+      endDraw();
+      activeId = id;
+      view.src = rec.url;
+      view.alt = rec.name;
+      stage.hidden = false;
+      document.body.classList.add('has-image');
+      renderThumbs();
+      layout();
+      updateButtons();
+    }
+
+    function removePage(id) {
+      const i = pages.findIndex(p => p.id === id);
+      if (i < 0) return;
+      if (activeId === id) endDraw();
+      const [rec] = pages.splice(i, 1);
+      URL.revokeObjectURL(rec.url);
+      if (activeId === id) {
+        activeId = null;
+        const next = pages[Math.min(i, pages.length - 1)];
+        if (next) { setActive(next.id); }
+        else {
+          stage.hidden = true;
+          view.removeAttribute('src');
+          document.body.classList.remove('has-image');
+          updateButtons();
+        }
+      }
+      renderThumbs();
+    }
+
+    // ---- 导入（保留：点击 / 拖入 / 粘贴）----
     async function importImages(files) {
-      let failed = 0;
+      let failed = 0; const added = [];
       for (const file of files) {
-        if (!['image/png', 'image/jpeg'].includes(file.type) && !(file.type === '' && /\.(png|jpe?g)$/i.test(file.name))) { failed++; continue; }
+        const okType = ['image/png', 'image/jpeg'].includes(file.type)
+          || (file.type === '' && /\.(png|jpe?g)$/i.test(file.name));
+        if (!okType) { failed++; continue; }
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.src = url;
-        img.alt = file.name || '导入的题目图片';
+        img.alt = file.name || '导入的图片';
         img.draggable = false;
-        try { await img.decode(); board.append(img); urls.push(url); }
-        catch { URL.revokeObjectURL(url); failed++; }
+        try { await img.decode(); } catch { URL.revokeObjectURL(url); failed++; continue; }
+        const rec = { id: ++uid, name: file.name || '图片 ' + uid, url, img, strokes: [], undo: [], redo: [], zoom: 1 };
+        pages.push(rec);
+        added.push(rec);
       }
       if (failed) alert(`有 ${failed} 个文件无法导入，请选择有效的 PNG 或 JPG 图片。`);
+      if (added.length) {
+        openSidebar();
+        renderThumbs();
+        if (!activeId) setActive(added[0].id);
+      }
     }
     document.getElementById('import').onclick = () => input.click();
+    document.getElementById('import-side').onclick = () => input.click();
     input.onchange = () => { importImages([...input.files]); input.value = ''; };
     document.addEventListener('dragover', event => event.preventDefault());
     document.addEventListener('drop', event => { event.preventDefault(); importImages([...event.dataTransfer.files]); });
@@ -43,7 +626,9 @@
       const files = [...event.clipboardData.files];
       if (files.length) { event.preventDefault(); importImages(files); }
     });
-    window.addEventListener('pagehide', event => { if (!event.persisted) urls.forEach(url => URL.revokeObjectURL(url)); });
+    window.addEventListener('pagehide', event => { if (!event.persisted) pages.forEach(p => URL.revokeObjectURL(p.url)); });
+
+    new ResizeObserver(() => layout()).observe(main);
   </script>
 </body>
 </html>
